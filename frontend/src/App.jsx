@@ -6,6 +6,10 @@ import StatsStrip from './components/StatsStrip';
 import { fetchTickets, fetchStats, createTicket, updateTicketStatus, deleteTicket } from './api';
 import './App.css';
 
+// Ticket age and SLA breach status are computed by the server at fetch time,
+// so refresh periodically to keep them current.
+const REFRESH_INTERVAL_MS = 60 * 1000;
+
 function App() {
   const [tickets, setTickets] = useState([]);
   const [stats, setStats] = useState(null);
@@ -36,6 +40,21 @@ function App() {
 
   useEffect(() => {
     loadData();
+  }, [loadData]);
+
+  // Auto-refresh while the tab is visible, and immediately when the user returns to it
+  useEffect(() => {
+    function refreshIfVisible() {
+      if (document.visibilityState === 'visible') loadData();
+    }
+
+    const intervalId = setInterval(refreshIfVisible, REFRESH_INTERVAL_MS);
+    document.addEventListener('visibilitychange', refreshIfVisible);
+
+    return () => {
+      clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', refreshIfVisible);
+    };
   }, [loadData]);
 
   async function handleCreateTicket(ticketData) {

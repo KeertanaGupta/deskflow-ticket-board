@@ -1,63 +1,59 @@
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001';
 
-export async function fetchTickets(filters = {}) {
+// Shared request helper.
+// - Turns network failures (server down, CORS, offline) into a readable message.
+// - Copes with error responses that are not JSON (e.g. an HTML 502 page from the host).
+async function request(path, options = {}, fallbackMessage = 'Request failed') {
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${path}`, options);
+  } catch {
+    throw new Error('Cannot reach the DeskFlow server. Please check your connection and try again.');
+  }
+
+  let data = null;
+  try {
+    data = await res.json();
+  } catch {
+    // Response body was empty or not JSON
+  }
+
+  if (!res.ok) {
+    throw new Error((data && data.error) || `${fallbackMessage} (HTTP ${res.status})`);
+  }
+  return data;
+}
+
+export function fetchTickets(filters = {}) {
   const params = new URLSearchParams();
   if (filters.status) params.append('status', filters.status);
   if (filters.priority) params.append('priority', filters.priority);
   if (filters.breached) params.append('breached', 'true');
 
   const query = params.toString();
-  const url = `${API_BASE}/tickets${query ? '?' + query : ''}`;
-  const res = await fetch(url);
-  if (!res.ok) {
-    const data = await res.json();
-    throw new Error(data.error || 'Failed to fetch tickets');
-  }
-  return res.json();
+  return request(`/tickets${query ? '?' + query : ''}`, {}, 'Failed to fetch tickets');
 }
 
-export async function fetchStats() {
-  const res = await fetch(`${API_BASE}/tickets/stats`);
-  if (!res.ok) {
-    const data = await res.json();
-    throw new Error(data.error || 'Failed to fetch stats');
-  }
-  return res.json();
+export function fetchStats() {
+  return request('/tickets/stats', {}, 'Failed to fetch stats');
 }
 
-export async function createTicket(ticketData) {
-  const res = await fetch(`${API_BASE}/tickets`, {
+export function createTicket(ticketData) {
+  return request('/tickets', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(ticketData)
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to create ticket');
-  }
-  return data;
+  }, 'Failed to create ticket');
 }
 
-export async function updateTicketStatus(id, status) {
-  const res = await fetch(`${API_BASE}/tickets/${id}`, {
+export function updateTicketStatus(id, status) {
+  return request(`/tickets/${id}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status })
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to update ticket');
-  }
-  return data;
+  }, 'Failed to update ticket');
 }
 
-export async function deleteTicket(id) {
-  const res = await fetch(`${API_BASE}/tickets/${id}`, {
-    method: 'DELETE'
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to delete ticket');
-  }
-  return data;
+export function deleteTicket(id) {
+  return request(`/tickets/${id}`, { method: 'DELETE' }, 'Failed to delete ticket');
 }
